@@ -7,6 +7,8 @@ out/
 .vs/
 *.VC.db
 *.suo
+*.vcxproj.user
+
 
 .vscode/
 .idea/
