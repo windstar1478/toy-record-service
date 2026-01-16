@@ -9,6 +9,13 @@ out/
 *.suo
 *.vcxproj.user
 
+# build outputs
+x64/
+*.exe
+*.obj
+
+# Visual Studio temp
+toy-reco.*/
 
 .vscode/
 .idea/
