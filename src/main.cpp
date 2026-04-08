@@ -32,7 +32,8 @@ int main() {
 
 	httplib::Server server; //서버 객체 생성
 
-	server.Get("/health", [](const httplib::Request& req, httplib::Response& res) { //'/health'로 GET 요청이 오면 이 코드 실행
+
+	server.Get("/health", [](const httplib::Request& req, httplib::Response& res) {
 		cout << "[REQ] GET /health" << endl;//GET 요청 로그 출력
 
 		if (req.has_param("token")) { //token이 존재하는지 확인
@@ -51,11 +52,12 @@ int main() {
 			build_response(res, 401, "[AUTH] missing token", "no token");
 		}
 
-	});
+		});
+
 
 	server.Post("/album-records", [](const httplib::Request& req, httplib::Response& res) {
 		cout << "[REQ] POST /album-records" << endl;
-		string body = req.body; 
+		string body = req.body;
 
 		//파싱
 		size_t p1 = body.find('/'); //'/'를 기준으로 파싱해 위치함
@@ -69,7 +71,7 @@ int main() {
 
 		//제공된 정보의 임시 문자열
 		string date = body.substr(0, p1); //처음부터 '/' 바로 전까지
-		string album = body.substr(p1 + 1, p2 - p1 - 1); 
+		string album = body.substr(p1 + 1, p2 - p1 - 1);
 		string artist = body.substr(p2 + 1);
 
 		//중복 검사 (date, album, artist)
@@ -86,30 +88,103 @@ int main() {
 		AlbumRecords.emplace_back(id, date, album, artist); //중복이 아니면 데이터 추가
 		build_response(res, 201, "[RES] 201 created", "created");
 
-	});
+		});
+
 
 	server.Get("/album-records", [](const httplib::Request& req, httplib::Response& res) {
-		cout << "[REQ] GET /album-records" << endl;
-		//기록된 게 없는지(비어 있는지) 확인
-		if (AlbumRecords.empty()) {	//비어 있을 시
-			cout << "no records" << endl;
-			build_response(res, 200, "[RES] 200 ok", "no records");
-			return;
+		//쿼리에 id가 존재하는지 확인
+		if (req.has_param("id")) { //쿼리 파라미터로 존재 시
+			string Query_id = req.get_param_value("id"); //Query id 임시 생성 후 파라미터로 받은 id 값 저장
+			int id; //올바른 파라미터가 전달되었는지 확인용 변수 선언
+
+			try
+			{
+				//string으로 선언된 Query_id를 int로 변환
+				id = stoi(Query_id); //올바른 형식으로 전달됨
+			}
+			catch (const exception& invalid_type)
+			{
+				build_response(res, 400, "[RES] 400 Bad request (invalid type)", "Bad Request");
+				return;
+			}
+
+			for (const auto& r : AlbumRecords) { //특정 id 존재 확인
+				if (r.id == id) { //id 존재
+					cout << "id is found" << endl;
+
+					string result; //저장할 임시 문자열 생성
+
+					//해당 records의 정보 저장
+					result = to_string(r.id) + " | " + r.date + " | " + r.album + " | " + r.artist + "\n";
+
+					build_response(res, 200, "[RES] 200 ok (one record)", result);
+
+					return;
+				}
+			}
+
+			//찾고자 하는 id가 존재하지 않는다면
+			build_response(res, 404, "[RES] 404 Not Found", "Not Found");
+		}
+		else { //id가 쿼리 파라미터로 존재하지 않을 시
+			cout << "[REQ] GET /album-records" << endl;
+			//기록된 게 없는지(비어 있는지) 확인
+			if (AlbumRecords.empty()) {	//비어 있을 시
+				cout << "no records" << endl;
+				build_response(res, 200, "[RES] 200 ok(empty)", "no records");
+				return;
+			}
+
+			string result; //누적시킬 임시 문자열 생성
+
+			//모든 records들의 정보 저장
+			for (auto& record : AlbumRecords) {
+				result += to_string(record.id) + " | "
+					+ record.date + " | "
+					+ record.album + " | "
+					+ record.artist + "\n";
+			}
+
+			build_response(res, 200, "[RES] 200 ok", result);
 		}
 
-		string result; //누적시킬 임시 문자열 생성
+		});
 
-		//모든 records들의 정보 저장
-		for (auto& record : AlbumRecords) {
-			result += to_string(record.id) + " | "
-				+ record.date + " | "
-				+ record.album + " | "
-				+ record.artist + "\n";
+
+	server.Delete("/album-records", [](const httplib::Request& req, httplib::Response& res) {
+		if (req.has_param("id")) { //id가 쿼리 파라미터로 존재 시
+			string Query_id = req.get_param_value("id"); //Query id 임시 생성 후 파라미터로 받은 id 값 저장
+			int id; //올바른 파라미터가 전달되었는지 확인용 변수 선언
+			try
+			{ //string으로 선언된 Query_id를 int로 변환
+				id = stoi(Query_id); //올바른 형식으로 전달됨
+			}
+			catch (const exception& invalid_type)
+			{
+				build_response(res, 400, "[RES] 400 Bad request (invalid type)", "Bad Request");
+				return;
+			}
+			for (int i = 0; i < AlbumRecords.size(); i++) {
+				if (AlbumRecords[i].id == id) {
+					AlbumRecords.erase(AlbumRecords.begin() + i);
+					build_response(res, 200, "[RES] 200 ok(erased)", "erased");
+					return;
+				}
+			}
+
+			//찾고자 하는 id가 존재하지 않는다면
+			build_response(res, 404, "[RES] 404 Not Found", "Not Found");
+
+		}
+		else { //id가 쿼리 파라미터로 존재 않을 시 (요청이 잘못됨)
+			build_response(res, 400, "[RES] 400 Bad Request(no id)", "Bad Request");
 		}
 
-		build_response(res, 200, "[RES] 200 ok", result);
-	});
-	
+
+		});
+
+
+
 
 	cout << "[LISTEN] waiting for requests on 8080" << endl; //8080번 포트에서 대기할 것이라 선언
 	//서버 실행
