@@ -74,6 +74,12 @@ int main() {
 		string album = body.substr(p1 + 1, p2 - p1 - 1);
 		string artist = body.substr(p2 + 1);
 
+		//입력된 정보가 비어있는지 확인
+		if (date.empty() || album.empty() || artist.empty()) {
+				build_response(res, 400, "[RES] 400 Bad Request(empty field)", "bad request");
+				return;
+		}
+
 		//중복 검사 (date, album, artist)
 		for (auto& r : AlbumRecords) {
 			if (r.date == date && r.album == album && r.artist == artist) { //모두 중복 시
@@ -184,7 +190,70 @@ int main() {
 		});
 
 
+	server.Put("/album-records", [](const httplib::Request& req, httplib::Response& res) {
+		//if id exise? no -> 400 Bad Request
+		//can id to int? no -> 400 Bad Request
+		
+		//vector for -> if found -> update -> 200 OK, not found -> 404 Not Found
+		
+		if (req.has_param("id")) { //id가 쿼리 파라미터로 존재 시
+			string Query_id = req.get_param_value("id"); //Query id 임시 생성 후 파라미터로 받은 id 값 저장
+			int id; //올바른 파라미터가 전달되었는지 확인용 변수 선언
+			try
+			{ //string으로 선언된 Query_id를 int로 변환
+				id = stoi(Query_id); //올바른 형식
+			}
+			catch (const exception& invalid_type)
+			{
+				build_response(res, 400, "[RES] 400 Bad request (invalid type)", "Bad Request");
+				return;
+			}
+			for (int i = 0; i < AlbumRecords.size(); i++) {
+				if (AlbumRecords[i].id == id) {
+					string body = req.body;
 
+					//파싱
+					size_t p1 = body.find('/'); //'/'를 기준으로 파싱해 위치함
+					size_t p2 = body.find('/', p1 + 1);
+
+					//잘못된 입력처리
+					if (p1 == string::npos || p2 == string::npos) {
+						build_response(res, 400, "[RES] 400 Bad Request", "bad request");
+						return;
+					}
+
+					//제공된 정보의 임시 문자열
+					string date = body.substr(0, p1); //처음부터 '/' 바로 전까지
+					string album = body.substr(p1 + 1, p2 - p1 - 1);
+					string artist = body.substr(p2 + 1);
+
+					//입력된 정보가 비어있는지 확인
+					if (date.empty() || album.empty() || artist.empty()) {
+						build_response(res, 400, "[RES] 400 Bad Request(empty field)", "bad request");
+						return;
+					}
+
+					//업데이트
+					AlbumRecords[i].date = date; 
+					AlbumRecords[i].album = album;
+					AlbumRecords[i].artist = artist;
+					
+					build_response(res, 200, "[RES] 200 ok(updated)", "updated");
+					return;
+				}
+			}
+
+			//찾고자 하는 id가 존재하지 않는다면
+			build_response(res, 404, "[RES] 404 Not Found", "Not Found");
+
+		}
+		else {
+			build_response(res, 400, "[RES] 400 Bad Request(no id)", "Bad Request");
+			return;
+		}
+		
+
+		});
 
 	cout << "[LISTEN] waiting for requests on 8080" << endl; //8080번 포트에서 대기할 것이라 선언
 	//서버 실행
