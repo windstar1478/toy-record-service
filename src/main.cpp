@@ -13,7 +13,7 @@ struct AlbumRecord
 	string album;
 	string artist;
 
-	AlbumRecord(int id, const string& date, const string& album, const string &artist) 
+	AlbumRecord(int id, const string& date, const string& album, const string& artist) 
 		: id(id), date(date), album(album), artist(artist) {}
 };
 vector<AlbumRecord> AlbumRecords;	
@@ -25,6 +25,20 @@ void build_response(httplib::Response& res, int status_code,
 
 	res.status = status_code;
 	res.set_content(body, "text/plain");
+}
+
+bool is_valid_token(httplib::Response& res, const string& token) {
+	if (token == "valid_token") {
+		return true;
+	}
+	else if (token.empty()) {
+		build_response(res, 401, "[AUTH] missing token", "no token");
+		return false;
+	}
+	else {
+		build_response(res, 401, "[AUTH] unauthorized", "unauthorized");
+		return false;
+	}
 }
 
 int main() {
@@ -40,7 +54,7 @@ int main() {
 			string token = req.get_param_value("token"); //사용자가 제공한 token값 조회 후 (sting) token에 저장
 			cout << "token: " << token << endl;
 
-			if (token == "abc") { //만약 제공된 token 값이 "abc"와 일치한다면
+			if (token == "valid_token") { //만약 제공된 token이 유효하다면
 				cout << "token success, server on" << endl;
 				build_response(res, 200, "[RES] 200 ok", "token success, server on");
 			}
@@ -158,6 +172,11 @@ int main() {
 
 
 	server.Delete("/album-records", [](const httplib::Request& req, httplib::Response& res) {
+
+		if (!is_valid_token(res, req.get_param_value("token"))) { //token이 유효하지 않음
+			return;
+		}
+
 		if (req.has_param("id")) { //id가 쿼리 파라미터로 존재 시
 			string Query_id = req.get_param_value("id"); //Query id 임시 생성 후 파라미터로 받은 id 값 저장
 			int id; //올바른 파라미터가 전달되었는지 확인용 변수 선언
@@ -191,11 +210,10 @@ int main() {
 
 
 	server.Put("/album-records", [](const httplib::Request& req, httplib::Response& res) {
-		//if id exise? no -> 400 Bad Request
-		//can id to int? no -> 400 Bad Request
-		
-		//vector for -> if found -> update -> 200 OK, not found -> 404 Not Found
-		
+		if (!is_valid_token(res, req.get_param_value("token"))) { //token이 유효하지 않음
+			return;
+		}
+
 		if (req.has_param("id")) { //id가 쿼리 파라미터로 존재 시
 			string Query_id = req.get_param_value("id"); //Query id 임시 생성 후 파라미터로 받은 id 값 저장
 			int id; //올바른 파라미터가 전달되었는지 확인용 변수 선언
@@ -254,6 +272,36 @@ int main() {
 		
 
 		});
+
+
+	server.Post("/login", [](const httplib::Request& req, httplib::Response& res) {
+		cout << "[REQ] POST /login" << endl;
+
+		string body = req.body;
+		//body: id=user&pw=1234
+
+		//파싱
+		size_t p = body.find('&'); //'&'를 기준으로 파싱해 위치함
+
+		if (p == string::npos) { //잘못된 입력처리
+			build_response(res, 400, "[RES] 400 Bad Request", "bad request");
+			return;
+		}
+
+		const string id = body.substr(3, p - 3); //id=user
+		const string pw = body.substr(p + 4); //pw=1234
+
+		if (id == "user" && pw == "1234") { //id와 pw가 일치하는지 확인
+			build_response(res, 200, "[RES] 200 ok", "valid_token"); 
+		}
+		else {
+			build_response(res, 401, "[RES] 401 Unauthorized", "invalid credentials");
+		}
+
+		});
+
+
+
 
 	cout << "[LISTEN] waiting for requests on 8080" << endl; //8080번 포트에서 대기할 것이라 선언
 	//서버 실행
